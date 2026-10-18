@@ -15,3 +15,14 @@ SF_WCG_COMPOSITION_DATA_SPACE := 143261696
 TARGET_USES_QTI_MAPPER_2_0 := true
 TARGET_USES_QTI_MAPPER_EXTENSIONS_1_1 := true
 TARGET_USES_GRALLOC4 := true
+
+ifeq ($(TARGET_BOARD_PLATFORM),sdm845)
+TARGET_USES_TP10_UBWC_FOR_10BIT := true
+endif
+
+ifeq ($(TARGET_USES_TP10_UBWC_FOR_10BIT),true)
+SOONG_CONFIG_NAMESPACES += qtidisplay
+SOONG_CONFIG_qtidisplay += target_uses_tp10_ubwc_for_10bit
+SOONG_CONFIG_qtidisplay_target_uses_tp10_ubwc_for_10bit := true
+endif
+

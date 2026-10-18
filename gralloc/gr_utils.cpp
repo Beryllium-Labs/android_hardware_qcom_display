@@ -1418,6 +1418,11 @@ int GetImplDefinedFormat(uint64_t usage, int format) {
   // the usage bits, gralloc assigns a format.
   if (format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED ||
       format == HAL_PIXEL_FORMAT_YCbCr_420_888) {
+#ifdef USE_TP10_UBWC_FOR_10BIT
+    if (usage & GRALLOC_USAGE_PRIVATE_10BIT && format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
+      return HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC;
+    }
+#endif
     if ((usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC || usage & GRALLOC_USAGE_PRIVATE_ALLOC_UBWC_PI)
         && format != HAL_PIXEL_FORMAT_YCbCr_420_888) {
       gr_format = HAL_PIXEL_FORMAT_YCbCr_420_SP_VENUS_UBWC;
