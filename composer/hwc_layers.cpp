@@ -571,7 +571,10 @@ HWC2::Error HWCLayer::SetLayerSourceCrop(hwc_frect_t crop) {
 
 HWC2::Error HWCLayer::SetLayerTransform(HWC2::Transform transform) {
   LayerTransform layer_transform = {};
-  switch (transform) {
+  // SurfaceFlinger may pass extra flags (e.g. NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY = 0x08)
+  // during zoom/rotation animations. Mask out non-orientation bits to avoid Error::BadParameter.
+  auto clean_transform = static_cast<HWC2::Transform>(static_cast<uint32_t>(transform) & 0x7);
+  switch (clean_transform) {
     case HWC2::Transform::FlipH:
       layer_transform.flip_horizontal = true;
       break;
