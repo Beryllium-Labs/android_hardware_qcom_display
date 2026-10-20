@@ -409,7 +409,7 @@ unsigned int GetSize(const BufferInfo &info, unsigned int alignedw, unsigned int
       case HAL_PIXEL_FORMAT_YCbCr_420_P010_VENUS:
         size = VENUS_BUFFER_SIZE(COLOR_FMT_P010,
                                  width,
-                                 height);
+                                 height) + 4096;
         break;
       case HAL_PIXEL_FORMAT_YCbCr_422_SP:
       case HAL_PIXEL_FORMAT_YCrCb_422_SP:
@@ -959,10 +959,10 @@ unsigned int GetUBwcSize(int width, int height, int format, unsigned int aligned
       size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12_UBWC, width, height);
       break;
     case HAL_PIXEL_FORMAT_YCbCr_420_TP10_UBWC:
-      size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12_BPP10_UBWC, width, height);
+      size = VENUS_BUFFER_SIZE(COLOR_FMT_NV12_BPP10_UBWC, width, height) + 4096;
       break;
     case HAL_PIXEL_FORMAT_YCbCr_420_P010_UBWC:
-      size = VENUS_BUFFER_SIZE(COLOR_FMT_P010_UBWC, width, height);
+      size = VENUS_BUFFER_SIZE(COLOR_FMT_P010_UBWC, width, height) + 4096;
       break;
 #endif
     default:
