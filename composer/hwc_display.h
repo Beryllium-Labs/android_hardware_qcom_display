@@ -145,6 +145,7 @@ class HWCColorMode {
   HWC2::Error SetColorTransform(const float *matrix, android_color_transform_t hint);
   HWC2::Error RestoreColorTransform();
   ColorMode GetCurrentColorMode() { return current_color_mode_; }
+  DynamicRangeType GetCurrentDynamicRange() { return curr_dynamic_range_; }
   HWC2::Error ApplyCurrentColorModeWithRenderIntent(bool hdr_present);
   HWC2::Error CacheColorModeWithRenderIntent(ColorMode mode, RenderIntent intent);
 
@@ -316,6 +317,9 @@ class HWCDisplay : public DisplayEventHandler {
   void SetValidationState(DisplayValidateState state) { validate_state_ = state; }
   ColorMode GetCurrentColorMode() {
     return (color_mode_ ? color_mode_->GetCurrentColorMode() : ColorMode::SRGB);
+  }
+  DynamicRangeType GetCurrentDynamicRange() {
+    return (color_mode_ ? color_mode_->GetCurrentDynamicRange() : kSdrType);
   }
   bool HWCClientNeedsValidate() {
     return (has_client_composition_ || layer_stack_.flags.single_buffered_layer_present);

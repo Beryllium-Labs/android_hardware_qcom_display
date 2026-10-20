@@ -238,6 +238,7 @@ class DisplayBase : public DisplayInterface {
   bool SetHdrModeAtStart(LayerStack *layer_stack);
   PrimariesTransfer GetBlendSpaceFromColorMode();
   bool IsHdrMode(const AttrVal &attr);
+  bool IsHdrMode(const std::string &mode_name, const AttrVal &attr);
   void InsertBT2020PqHlgModes(const std::string &str_render_intent);
   DisplayError SetupRC();
   DisplayError HandlePendingVSyncEnable(const shared_ptr<Fence> &retire_fence);

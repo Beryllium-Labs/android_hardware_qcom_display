@@ -143,6 +143,12 @@ HWC2::Error HWCColorMode::SetColorModeWithRenderIntent(ColorMode mode, RenderInt
   if (mode_string.empty()) {
     mode_string = color_mode_map_[mode][intent][kHdrType];
   }
+  if (mode_string.empty()) {
+    mode_string = color_mode_map_[mode][RenderIntent::COLORIMETRIC][kHdrType];
+  }
+  if (mode_string.empty()) {
+    mode_string = color_mode_map_[mode][RenderIntent::COLORIMETRIC][kSdrType];
+  }
   DisplayError error = display_intf_->SetColorMode(mode_string);
   if (error != kErrorNone) {
     DLOGE("failed for mode = %d intent = %d name = %s", mode, intent, mode_string.c_str());
@@ -409,6 +415,8 @@ void HWCColorMode::PopulateColorModes() {
         }
         color_mode_map_[ColorMode::BT2100_PQ][render_intent][kHdrType] = mode_string;
         color_mode_map_[ColorMode::BT2100_HLG][render_intent][kHdrType] = mode_string;
+        color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::TONE_MAP_COLORIMETRIC][kHdrType] = mode_string;
+        color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::TONE_MAP_COLORIMETRIC][kHdrType] = mode_string;
       } else if (color_gamut == kBt2020) {
         if (transfer == kSt2084) {
           color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::COLORIMETRIC]
@@ -772,6 +780,15 @@ void HWCDisplay::BuildLayerStack() {
       // Dont honor HDR when its handling is disabled
       layer->input_buffer.flags.hdr = true;
       layer_stack_.flags.hdr_present = true;
+
+      // If target has no SSPP tone mapping hardware and display is in SDR mode,
+      // DPU cannot tone-map HDR layer to SDR panel; force GPU client composition.
+      if (!display_intf_->IsSupportSsppTonemap() &&
+          GetCurrentDynamicRange() == kSdrType &&
+          GetCurrentColorMode() != ColorMode::BT2100_PQ &&
+          GetCurrentColorMode() != ColorMode::BT2100_HLG) {
+        layer->flags.skip = true;
+      }
     }
 
     if (game_supported_ && (hwc_layer->GetType() == kLayerGame)) {

@@ -1214,12 +1214,15 @@ DisplayError DisplayBase::SetColorMode(const std::string &color_mode) {
     DLOGE("Failed to pass blend space, error = %d display_type_ = %d", error, display_type_);
   }
 
+  bool is_hdr_mode = (dynamic_range == kHdr || color_mode.find("HDR") != std::string::npos ||
+                      color_mode == kBt2020Pq || color_mode == kBt2020Hlg);
+
   error = SetColorModeInternal(color_mode, str_render_intent,  blend_space);
   if (error != kErrorNone) {
     return error;
   }
 
-  comp_manager_->ControlDpps(dynamic_range != kHdr);
+  comp_manager_->ControlDpps(!is_hdr_mode);
 
   return error;
 }
@@ -1255,7 +1258,11 @@ DisplayError DisplayBase::SetColorModeInternal(const std::string &color_mode,
     render_intent = std::stoi(str_render_intent);
   }
 
-  if (render_intent < 0 || render_intent > MAX_EXTENDED_RENDER_INTENT) {
+  if (render_intent < 0) {
+    render_intent = 0;
+  }
+
+  if (render_intent > MAX_EXTENDED_RENDER_INTENT) {
     DLOGW("Invalid render intent %d for mode id = %d", render_intent, sde_display_mode->id);
     return kErrorNotSupported;
   }
@@ -1919,9 +1926,12 @@ DisplayError DisplayBase::InitializeColorModes() {
           color_mode_attr_map_.insert(std::make_pair(color_modes_[i].name, var));
           // If target doesn't support SSPP tone maping and color mode is HDR,
           // add bt2020pq and bt2020hlg color modes.
-          if (hw_resource_info_.src_tone_map.none() && IsHdrMode(var)) {
+          if (hw_resource_info_.src_tone_map.none() && IsHdrMode(color_modes_[i].name, var)) {
             std::string str_render_intent;
             GetValueOfModeAttribute(var, kRenderIntentAttribute, &str_render_intent);
+            if (str_render_intent.empty() || std::stoi(str_render_intent) < 0) {
+              str_render_intent = "0";
+            }
             color_mode_map_.insert(std::make_pair(kBt2020Pq, &color_modes_[i]));
             color_mode_map_.insert(std::make_pair(kBt2020Hlg, &color_modes_[i]));
             num_insert_color_modes = 2;
@@ -1978,8 +1988,11 @@ DisplayError DisplayBase::GetClientTargetSupport(uint32_t width, uint32_t height
 
     // Check for BT2020 support
     if (color_metadata.colorPrimaries == ColorPrimaries_BT2020) {
-      DLOGW("Unsupported Color Primary = %d", color_metadata.colorPrimaries);
-      return kErrorNotSupported;
+      if (color_mode_map_.find(kBt2020Pq) == color_mode_map_.end() &&
+          color_mode_map_.find("HDR_P3_standard") == color_mode_map_.end()) {
+        DLOGW("Unsupported Color Primary = %d", color_metadata.colorPrimaries);
+        return kErrorNotSupported;
+      }
     }
   }
 
@@ -2209,7 +2222,11 @@ PrimariesTransfer DisplayBase::GetBlendSpaceFromColorMode() {
     }
   } else if (color_gamut == kDcip3) {
     pt.primaries = GetColorPrimariesFromAttribute(color_gamut);
-    pt.transfer = Transfer_sRGB;
+    if (current_color_mode_.find("HDR") != std::string::npos || dynamic_range == kHdr) {
+      pt.transfer = Transfer_SMPTE_ST2084;
+    } else {
+      pt.transfer = Transfer_sRGB;
+    }
   }
 
   return pt;
@@ -2232,10 +2249,15 @@ void DisplayBase::InsertBT2020PqHlgModes(const std::string &str_render_intent) {
 }
 
 bool DisplayBase::IsHdrMode(const AttrVal &attr) {
+  return IsHdrMode("", attr);
+}
+
+bool DisplayBase::IsHdrMode(const std::string &mode_name, const AttrVal &attr) {
   std::string color_gamut, dynamic_range;
   GetValueOfModeAttribute(attr, kColorGamutAttribute, &color_gamut);
   GetValueOfModeAttribute(attr, kDynamicRangeAttribute, &dynamic_range);
-  if (color_gamut == kDcip3 && dynamic_range == kHdr) {
+  if (color_gamut == kDcip3 &&
+      (dynamic_range == kHdr || mode_name.find("HDR") != std::string::npos)) {
     return true;
   }
 
