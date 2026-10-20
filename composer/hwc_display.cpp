@@ -121,6 +121,9 @@ HWC2::Error HWCColorMode::ValidateColorModeWithRenderIntent(ColorMode mode, Rend
     return HWC2::Error::Unsupported;
   }
   if (color_mode_map_[mode].find(intent) == color_mode_map_[mode].end()) {
+    if (color_mode_map_[mode].find(RenderIntent::COLORIMETRIC) != color_mode_map_[mode].end()) {
+      return HWC2::Error::None;
+    }
     DLOGE("Could not find render intent %d in mode %d", intent, mode);
     return HWC2::Error::Unsupported;
   }
@@ -139,15 +142,25 @@ HWC2::Error HWCColorMode::SetColorModeWithRenderIntent(ColorMode mode, RenderInt
     return HWC2::Error::None;
   }
 
-  auto mode_string = color_mode_map_[mode][intent][kSdrType];
+  auto mode_string = color_mode_map_[mode][intent][curr_dynamic_range_];
+  if (mode_string.empty()) {
+    mode_string = color_mode_map_[mode][intent][kSdrType];
+  }
   if (mode_string.empty()) {
     mode_string = color_mode_map_[mode][intent][kHdrType];
+  }
+  if (mode_string.empty()) {
+    mode_string = color_mode_map_[mode][RenderIntent::COLORIMETRIC][curr_dynamic_range_];
   }
   if (mode_string.empty()) {
     mode_string = color_mode_map_[mode][RenderIntent::COLORIMETRIC][kHdrType];
   }
   if (mode_string.empty()) {
     mode_string = color_mode_map_[mode][RenderIntent::COLORIMETRIC][kSdrType];
+  }
+  if (mode_string.empty()) {
+    DLOGW("No mode string found for mode = %d intent = %d range = %d", mode, intent, curr_dynamic_range_);
+    return HWC2::Error::None;
   }
   DisplayError error = display_intf_->SetColorMode(mode_string);
   if (error != kErrorNone) {
@@ -199,9 +212,15 @@ HWC2::Error HWCColorMode::ApplyCurrentColorModeWithRenderIntent(bool hdr_present
   std::string mode_string = preferred_mode_[current_color_mode_][curr_dynamic_range_];
   if (mode_string.empty()) {
     mode_string = color_mode_map_[current_color_mode_][current_render_intent_][curr_dynamic_range_];
+    if (mode_string.empty()) {
+      mode_string = color_mode_map_[current_color_mode_][RenderIntent::COLORIMETRIC][curr_dynamic_range_];
+    }
     if (mode_string.empty() && hdr_present) {
       // Use the colorimetric HDR mode, if an HDR mode with the current render intent is not present
       mode_string = color_mode_map_[current_color_mode_][RenderIntent::COLORIMETRIC][kHdrType];
+    }
+    if (mode_string.empty()) {
+      mode_string = color_mode_map_[current_color_mode_][RenderIntent::COLORIMETRIC][kSdrType];
     }
     if (mode_string.empty() &&
        (current_color_mode_ == ColorMode::DISPLAY_P3 ||
@@ -217,6 +236,12 @@ HWC2::Error HWCColorMode::ApplyCurrentColorModeWithRenderIntent(bool hdr_present
       mode_string = color_mode_map_[current_color_mode_][current_render_intent_][kHdrType];
       DLOGI("fall back to hdr mode for ColorMode::BT2100_PQ kSdrType");
     }
+  }
+
+  if (mode_string.empty()) {
+    DLOGW("No mode string found for mode = %d intent = %d range = %d",
+          current_color_mode_, current_render_intent_, curr_dynamic_range_);
+    return HWC2::Error::None;
   }
 
   auto error = SetPreferredColorModeInternal(mode_string, false, NULL, NULL);
@@ -419,14 +444,20 @@ void HWCColorMode::PopulateColorModes() {
         color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::TONE_MAP_COLORIMETRIC][kHdrType] = mode_string;
       } else if (color_gamut == kBt2020) {
         if (transfer == kSt2084) {
-          color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::COLORIMETRIC]
-                         [kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::COLORIMETRIC][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::ENHANCE][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::TONE_MAP_COLORIMETRIC][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_PQ][RenderIntent::TONE_MAP_ENHANCE][kHdrType] = mode_string;
         } else if (transfer == kHlg) {
-          color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::COLORIMETRIC]
-                         [kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::COLORIMETRIC][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::ENHANCE][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::TONE_MAP_COLORIMETRIC][kHdrType] = mode_string;
+          color_mode_map_[ColorMode::BT2100_HLG][RenderIntent::TONE_MAP_ENHANCE][kHdrType] = mode_string;
         } else if (transfer == kSrgb) {
-          color_mode_map_[ColorMode::DISPLAY_BT2020][RenderIntent::COLORIMETRIC]
-                         [kSdrType] = mode_string;
+          color_mode_map_[ColorMode::DISPLAY_BT2020][RenderIntent::COLORIMETRIC][kSdrType] = mode_string;
+          color_mode_map_[ColorMode::DISPLAY_BT2020][RenderIntent::ENHANCE][kSdrType] = mode_string;
+          color_mode_map_[ColorMode::DISPLAY_BT2020][RenderIntent::TONE_MAP_COLORIMETRIC][kSdrType] = mode_string;
+          color_mode_map_[ColorMode::DISPLAY_BT2020][RenderIntent::TONE_MAP_ENHANCE][kSdrType] = mode_string;
         }
       }
     } else {
@@ -440,6 +471,18 @@ void HWCColorMode::PopulateColorModes() {
 
   if (color_mode_map_.find(ColorMode::NATIVE) == color_mode_map_.end()) {
     color_mode_map_[ColorMode::NATIVE][RenderIntent::COLORIMETRIC][kSdrType] = "hal_native_identity";
+  }
+
+  // Ensure all render intents are available for every populated color mode
+  for (auto &mode_entry : color_mode_map_) {
+    if (mode_entry.second.find(RenderIntent::COLORIMETRIC) != mode_entry.second.end()) {
+      auto col_ranges = mode_entry.second[RenderIntent::COLORIMETRIC];
+      for (auto intent : {RenderIntent::ENHANCE, RenderIntent::TONE_MAP_COLORIMETRIC, RenderIntent::TONE_MAP_ENHANCE}) {
+        if (mode_entry.second.find(intent) == mode_entry.second.end()) {
+          mode_entry.second[intent] = col_ranges;
+        }
+      }
+    }
   }
 }
 
@@ -781,9 +824,11 @@ void HWCDisplay::BuildLayerStack() {
       layer->input_buffer.flags.hdr = true;
       layer_stack_.flags.hdr_present = true;
 
-      // If target has no SSPP tone mapping hardware and display is in SDR mode,
-      // DPU cannot tone-map HDR layer to SDR panel; force GPU client composition.
+      // If target has no SSPP tone mapping hardware, display is in SDR mode,
+      // and display does NOT support HDR mode, DPU cannot tone-map HDR layer to SDR panel;
+      // force GPU client composition.
       if (!display_intf_->IsSupportSsppTonemap() &&
+          !IsHdrSupported() &&
           GetCurrentDynamicRange() == kSdrType &&
           GetCurrentColorMode() != ColorMode::BT2100_PQ &&
           GetCurrentColorMode() != ColorMode::BT2100_HLG) {

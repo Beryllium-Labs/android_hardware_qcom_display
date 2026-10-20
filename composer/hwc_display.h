@@ -146,6 +146,10 @@ class HWCColorMode {
   HWC2::Error RestoreColorTransform();
   ColorMode GetCurrentColorMode() { return current_color_mode_; }
   DynamicRangeType GetCurrentDynamicRange() { return curr_dynamic_range_; }
+  bool IsHdrSupported() {
+    return color_mode_map_.find(ColorMode::BT2100_PQ) != color_mode_map_.end() ||
+           color_mode_map_.find(ColorMode::BT2100_HLG) != color_mode_map_.end();
+  }
   HWC2::Error ApplyCurrentColorModeWithRenderIntent(bool hdr_present);
   HWC2::Error CacheColorModeWithRenderIntent(ColorMode mode, RenderIntent intent);
 
@@ -320,6 +324,9 @@ class HWCDisplay : public DisplayEventHandler {
   }
   DynamicRangeType GetCurrentDynamicRange() {
     return (color_mode_ ? color_mode_->GetCurrentDynamicRange() : kSdrType);
+  }
+  bool IsHdrSupported() {
+    return (color_mode_ ? color_mode_->IsHdrSupported() : false);
   }
   bool HWCClientNeedsValidate() {
     return (has_client_composition_ || layer_stack_.flags.single_buffered_layer_present);

@@ -135,6 +135,9 @@ bool GetRange(const int32_t &dataspace, ColorRange *color_range) {
     case HAL_DATASPACE_RANGE_LIMITED:
       *color_range = Range_Limited;
       break;
+    case HAL_DATASPACE_RANGE_UNSPECIFIED:
+      *color_range = Range_Limited;
+      break;
     case HAL_DATASPACE_RANGE_EXTENDED:
       *color_range = Range_Extended;
       return false;
